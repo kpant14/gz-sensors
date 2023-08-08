@@ -383,8 +383,6 @@ bool NavSatMultipathSensor::Update(const std::chrono::steady_clock::duration &_n
 //////////////////////////////////////////////////
 void NavSatMultipathSensor::SetLatitude(const math::Angle &_latitude)
 {
-  gzerr << "Here.\n";
-
   this->dataPtr->latitude = _latitude;
 }
 
