@@ -147,6 +147,19 @@ gz_add_component(force_torque SOURCES ${force_torque_sources} GET_TARGET_NAME fo
 set(navsat_sources NavSatSensor.cc)
 gz_add_component(navsat SOURCES ${navsat_sources} GET_TARGET_NAME navsat_target)
 
+set(navsat_multipath_sources NavSatMultipathSensor.cc)
+gz_add_component(navsat_multipath SOURCES ${navsat_multipath_sources}
+DEPENDS_ON_COMPONENTS lidar 
+GET_TARGET_NAME navsat_multipath_target)
+
+target_compile_definitions(${navsat_multipath_target} PUBLIC NavSatMultipathSensor_EXPORTS)
+target_link_libraries(${navsat_multipath_target}
+  PRIVATE
+    gz-msgs${GZ_MSGS_VER}::gz-msgs${GZ_MSGS_VER}
+    gz-transport${GZ_TRANSPORT_VER}::gz-transport${GZ_TRANSPORT_VER}
+    ${lidar_target}
+)
+
 set(rgbd_camera_sources RgbdCameraSensor.cc)
 gz_add_component(rgbd_camera
   SOURCES ${rgbd_camera_sources}
