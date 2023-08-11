@@ -27,6 +27,13 @@ set (gtest_sources
   Util_TEST.cc
 )
 
+# Adding libpredict to predict satellites orbits
+set(ENV{PKG_CONFIG_PATH} "${CMAKE_INSTALL_PREFIX}/../libpredict/lib/pkgconfig/\
+:/usr/share/pkg-config\
+:/usr/lib/pkg-config
+:$ENV{PKG_CONFIG_PATH}")
+pkg_check_modules(PREDICT REQUIRED IMPORTED_TARGET predict)
+
 if (MSVC)
   # TODO(louise) Remove this once warnings are suppressed in gz-rendering
   set_source_files_properties(
@@ -153,11 +160,18 @@ DEPENDS_ON_COMPONENTS lidar
 GET_TARGET_NAME navsat_multipath_target)
 
 target_compile_definitions(${navsat_multipath_target} PUBLIC NavSatMultipathSensor_EXPORTS)
+
+target_include_directories(${navsat_multipath_target} PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include> ${PREDICT_INCLUDE_DIRS} ${PREDICT_LIBRARY_DIRS} ${Eigen_INCLUDE_DIRS})
+
 target_link_libraries(${navsat_multipath_target}
   PRIVATE
     gz-msgs${GZ_MSGS_VER}::gz-msgs${GZ_MSGS_VER}
     gz-transport${GZ_TRANSPORT_VER}::gz-transport${GZ_TRANSPORT_VER}
     ${lidar_target}
+    ${Eigen_LIBRARIES}
+    ${PREDICT_LINK_LIBRARIES}
 )
 
 set(rgbd_camera_sources RgbdCameraSensor.cc)

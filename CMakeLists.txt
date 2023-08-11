@@ -9,7 +9,8 @@ project(gz-sensors7 VERSION 7.2.0)
 # Find gz-cmake
 #============================================================================
 find_package(gz-cmake3 REQUIRED)
-
+find_package(PkgConfig REQUIRED)
+find_package (Eigen3 REQUIRED)
 #============================================================================
 # Configure the project
 #============================================================================
