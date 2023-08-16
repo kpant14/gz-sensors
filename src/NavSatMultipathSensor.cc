@@ -429,6 +429,16 @@ bool NavSatMultipathSensor::Update(const std::chrono::steady_clock::duration &_n
   GetSatellitesInfo(this->dataPtr->timeinfo, recLLA, satECEF, satTrueRange, azimuth, elevation);
   int activeNumSat = satTrueRange.size();
   //gzerr << "num sat: "<< activeNumSat<< std::endl;
+  // float range;
+  // GetRangefromAzimuthElevation(&range, 0, 0 );
+  // gzerr <<"O deg:" << range << std::endl;
+  // GetRangefromAzimuthElevation(&range, M_PI_2, 0 );
+  // gzerr <<"90 deg:"<< range << std::endl;
+  // GetRangefromAzimuthElevation(&range, M_PI, 0 );
+  // gzerr <<"180 deg:"<< range << std::endl;
+  // GetRangefromAzimuthElevation(&range, 1.5 * M_PI, 0 );
+  // gzerr << "270 deg:" <<range << std::endl;
+
 
   //Ray_ranges stores the ranges of both satellite and reflected rays.
   std::vector<double> rayRanges; 
@@ -454,6 +464,7 @@ bool NavSatMultipathSensor::Update(const std::chrono::steady_clock::duration &_n
   // Iterate for all the visible satellites (positive elevation angles)
   for (int i = 0; i < activeNumSat; i++)
   {
+    //gzerr << rayRanges[i]<<" "<< rayRanges[i+1] << std::endl; 
     if (rayElevation[2*i] > (15*M_PI)/180)
     {
       // ray is obstructed
@@ -501,6 +512,8 @@ bool NavSatMultipathSensor::Update(const std::chrono::steady_clock::duration &_n
   }
   if ((activeNumSat - numSatBlocked) > 4)
   {
+    // Found a FIX 
+    
     // Calculate the reciever's position using the satellite's predicted coordinates and the pseudo-ranges.
     Eigen::Vector3d recECEF(0,0,0);  
     std::vector<double> dop;
@@ -512,35 +525,33 @@ bool NavSatMultipathSensor::Update(const std::chrono::steady_clock::duration &_n
     this->dataPtr->navsatConverter.ecef2Geodetic(recECEF(0), recECEF(1),recECEF(2), &latitude,
                       &longitude, &altitude);
     
-    // g_geodetic_converter.geodetic2Enu(latitude,
-    //                   longitude, altitude, &enu_x,&enu_y,&enu_z);
-    // gnss_multipath_fix_msg.navsatfix.status.status = 1;
-    
-    // gnss_multipath_fix_msg.navsatfix.latitude = latitude;
-    // gnss_multipath_fix_msg.navsatfix.longitude = longitude;
-    // gnss_multipath_fix_msg.navsatfix.altitude = altitude;
-
-    // gnss_multipath_fix_msg.enu_gnss_fix[0] = enu_x;
-    // gnss_multipath_fix_msg.enu_gnss_fix[1] = enu_y;
-    // gnss_multipath_fix_msg.enu_gnss_fix[2] = enu_z;
-    
     // //Copy DOP values to the message.
     // std::copy(dop.begin(),
     //         dop.end(),
     //         gnss_multipath_fix_msg.dop.begin());
-    // msg.set_latitude_deg(latitude);
-    // msg.set_longitude_deg(longitude);
-    // msg.set_altitude(altitude);
-    // msg.set_velocity_east(this->dataPtr->velocity.X());
-    // msg.set_velocity_north(this->dataPtr->velocity.Y());
-    // msg.set_velocity_up(this->dataPtr->velocity.Z());
+    msg.set_latitude_deg(latitude);
+    msg.set_longitude_deg(longitude);
+    msg.set_altitude(altitude);
+    msg.set_velocity_east(this->dataPtr->velocity.X());
+    msg.set_velocity_north(this->dataPtr->velocity.Y());
+    msg.set_velocity_up(this->dataPtr->velocity.Z());
   }
-  msg.set_latitude_deg(this->dataPtr->latitude.Degree());
-  msg.set_longitude_deg(this->dataPtr->longitude.Degree());
-  msg.set_altitude(this->dataPtr->altitude);
-  msg.set_velocity_east(this->dataPtr->velocity.X());
-  msg.set_velocity_north(this->dataPtr->velocity.Y());
-  msg.set_velocity_up(this->dataPtr->velocity.Z());
+  else 
+  {
+    // No FIX
+    msg.set_latitude_deg(NAN);
+    msg.set_longitude_deg(NAN);
+    msg.set_altitude(NAN);
+    msg.set_velocity_east(NAN);
+    msg.set_velocity_north(NAN);
+    msg.set_velocity_up(NAN);
+  }
+  // msg.set_latitude_deg(this->dataPtr->latitude.Degree());
+  // msg.set_longitude_deg(this->dataPtr->longitude.Degree());
+  // msg.set_altitude(this->dataPtr->altitude);
+  // msg.set_velocity_east(this->dataPtr->velocity.X());
+  // msg.set_velocity_north(this->dataPtr->velocity.Y());
+  // msg.set_velocity_up(this->dataPtr->velocity.Z());
   // publish
   this->AddSequence(msg.mutable_header());
   this->dataPtr->pub.Publish(msg);
@@ -633,6 +644,7 @@ void NavSatMultipathSensor::GetRangefromAzimuthElevation(float *_range,
 bool NavSatMultipathSensor::GetLeastSquaresEstimate(std::vector<double> _meas,
                  std::vector<std::vector<double>> _sat_ecef, Eigen::Vector3d &_rec_ecef)
 {
+  GZ_PROFILE("NavSatMultipathSensor::GetLeastSquaresEstimate");
   const int nsat = _meas.size();
   Eigen::MatrixXd A, b;
   A.resize(nsat, 4);
@@ -663,6 +675,7 @@ bool NavSatMultipathSensor::GetLeastSquaresEstimate(std::vector<double> _meas,
 void NavSatMultipathSensor::CalculateDOP(std::vector<std::vector<double>> _sat_ecef, 
                     Eigen::Vector3d _rec_ecef, std::vector<double> &_dop)
 {
+  GZ_PROFILE("NavSatMultipathSensor::CalculateDOP");
   const int nsat = _sat_ecef.size();
  
   Eigen::MatrixXd A, Q, Q_local;
@@ -749,6 +762,34 @@ time_t NavSatMultipathSensor::MakeTimeUTC(const struct tm* timeinfo_utc)
 	ret_timeinfo.tm_year = timeinfo_utc->tm_year;
 	ret_timeinfo.tm_isdst = timeinfo_utc->tm_isdst;
 	return mktime(&ret_timeinfo);
+}
+
+void NavSatMultipathSensor::GetSatellitesInfo(struct tm *_timeinfo, std::vector<double> _rec_lla,
+      std::vector<std::vector<double>> &_sat_ecef, std::vector<double> &_true_range, std::vector<double> &_azimuth,
+      std::vector<double> &_elevation)
+{
+  GZ_PROFILE("NavSatMultipathSensor::GetSatellitesInfo");
+  // Predict the julian time using the current utc time
+  predict_julian_date_t curr_time = predict_to_julian(MakeTimeUTC(_timeinfo));
+  std::vector<double> ecef = {0,0,0};
+  for ( int i = 0; i < this->dataPtr->numSat; i++ )
+  {
+    // Predict satellite's position based on the current time.
+    predict_orbit(this->dataPtr->satOrbitElements[i], &this->dataPtr->satPosition[i], curr_time);
+    this->dataPtr->navsatConverter.geodetic2Ecef(this->dataPtr->satPosition[i].latitude*180.0/M_PI, this->dataPtr->satPosition[i].longitude*180.0/M_PI , 
+                  this->dataPtr->satPosition[i].altitude*1000 , &ecef[0], &ecef[1], &ecef[2]);
+    predict_observer_t *obs = predict_create_observer("obs", _rec_lla[0]*M_PI/180.0, _rec_lla[1]*M_PI/180.0, _rec_lla[2]);
+    struct predict_observation reciever_obs;
+    predict_observe_orbit(obs, &this->dataPtr->satPosition[i], &reciever_obs);
+    if (reciever_obs.elevation > 0)
+    {
+      _sat_ecef.push_back(ecef);
+      _true_range.push_back(reciever_obs.range*1000); //From Km to m  
+      _azimuth.push_back(reciever_obs.azimuth);
+      _elevation.push_back(reciever_obs.elevation);
+    }
+    
+  }
 }
 
 void NavSatMultipathSensor::ParseSatelliteTLE()
@@ -865,32 +906,5 @@ void NavSatMultipathSensor::ParseSatelliteTLE()
   {
       // Create orbit object
       this->dataPtr->satOrbitElements[i] = predict_parse_tle(this->dataPtr->tleLines[2*i], this->dataPtr->tleLines[2*i+1]);
-  }
-}
-
-void NavSatMultipathSensor::GetSatellitesInfo(struct tm *_timeinfo, std::vector<double> _rec_lla,
-      std::vector<std::vector<double>> &_sat_ecef, std::vector<double> &_true_range, std::vector<double> &_azimuth,
-      std::vector<double> &_elevation)
-{
-  // Predict the julian time using the current utc time
-  predict_julian_date_t curr_time = predict_to_julian(MakeTimeUTC(_timeinfo));
-  std::vector<double> ecef = {0,0,0};
-  for ( int i = 0; i < this->dataPtr->numSat; i++ )
-  {
-    // Predict satellite's position based on the current time.
-    predict_orbit(this->dataPtr->satOrbitElements[i], &this->dataPtr->satPosition[i], curr_time);
-    this->dataPtr->navsatConverter.geodetic2Ecef(this->dataPtr->satPosition[i].latitude*180.0/M_PI, this->dataPtr->satPosition[i].longitude*180.0/M_PI , 
-                  this->dataPtr->satPosition[i].altitude*1000 , &ecef[0], &ecef[1], &ecef[2]);
-    predict_observer_t *obs = predict_create_observer("obs", _rec_lla[0]*M_PI/180.0, _rec_lla[1]*M_PI/180.0, _rec_lla[2]);
-    struct predict_observation reciever_obs;
-    predict_observe_orbit(obs, &this->dataPtr->satPosition[i], &reciever_obs);
-    if (reciever_obs.elevation > 0)
-    {
-      _sat_ecef.push_back(ecef);
-      _true_range.push_back(reciever_obs.range*1000); //From Km to m  
-      _azimuth.push_back(reciever_obs.azimuth);
-      _elevation.push_back(reciever_obs.elevation);
-    }
-    
   }
 }
