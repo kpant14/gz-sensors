@@ -123,7 +123,8 @@ namespace gz
       /// \param[in] _altitude Altitude in meters; defaults to zero.
       public: void SetPosition(const math::Angle &_latitude,
           const math::Angle &_longitude, double _altitude = 0.0);
-
+      public: void SetSpooferPosition(const math::Angle &_latitude,
+      const math::Angle &_longitude, double _altitude);
 
       /// \brief Create Lidar sensor
       public: virtual bool CreateLidar() override;

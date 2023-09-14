@@ -20,7 +20,7 @@
 #pragma warning(disable: 4005)
 #pragma warning(disable: 4251)
 #endif
-#include <gz/msgs/navsat.pb.h>
+#include <gz/msgs/navsat_multipath.pb.h>
 #ifdef _WIN32
 #pragma warning(pop)
 #endif
@@ -121,6 +121,18 @@ class gz::sensors::NavSatMultipathPrivate
   // Time information to get the satellite position
   public: struct tm *timeinfo;
 
+  /// \brief Latitude angle
+  public: math::Angle spooferLat;
+
+  /// \brief Longitude angle
+  public: math::Angle spooferLon;
+
+  /// \brief Altitude
+  public: double spooferAlt = 0.0;
+
+
+  public: int count;
+
 };
 
 //////////////////////////////////////////////////
@@ -172,7 +184,7 @@ bool NavSatMultipathSensor::Load(const sdf::Sensor &_sdf)
     this->SetTopic("/navsat_multipath");
 
   this->dataPtr->pub =
-      this->dataPtr->node.Advertise<msgs::NavSat>(this->Topic());
+      this->dataPtr->node.Advertise<msgs::NavSatMultipath>(this->Topic());
 
   if (!this->dataPtr->pub)
   {
@@ -226,6 +238,7 @@ bool NavSatMultipathSensor::Load(const sdf::Sensor &_sdf)
   this->dataPtr->loaded = true;
   this->initialized = true;
 
+  this->dataPtr->count=0;
   return true;
 }
 
@@ -370,7 +383,7 @@ bool NavSatMultipathSensor::Update(const std::chrono::steady_clock::duration &_n
   this->Render();
 
 
-  msgs::NavSat msg;
+  msgs::NavSatMultipath msg;
   *msg.mutable_header()->mutable_stamp() = msgs::Convert(_now);
   msg.set_frame_id(this->FrameId());
 
@@ -482,7 +495,7 @@ bool NavSatMultipathSensor::Update(const std::chrono::steady_clock::duration &_n
           if (rangeOffset < 50)
           {
             //RCLCPP_INFO(ros_node_->get_logger(), "offset:%d %f", i, range_offset);
-            visibleSatRangeMeas.push_back(satTrueRange[i] + rangeOffset);
+            visibleSatRangeMeas.push_back(satTrueRange[i] + rangeOffset*0.1);
             visibleSatECEF.push_back(satECEF[i]);
           }
           else
@@ -510,48 +523,57 @@ bool NavSatMultipathSensor::Update(const std::chrono::steady_clock::duration &_n
       numSatBlocked++;
     }
   }
-  if ((activeNumSat - numSatBlocked) > 4)
-  {
-    // Found a FIX 
-    
-    // Calculate the reciever's position using the satellite's predicted coordinates and the pseudo-ranges.
-    Eigen::Vector3d recECEF(0,0,0);  
-    std::vector<double> dop;
-    double latitude=0, longitude=0, altitude=0;
 
-    GetLeastSquaresEstimate(visibleSatRangeMeas,  visibleSatECEF, recECEF);
-    CalculateDOP(visibleSatECEF, recECEF, dop);
-    
-    this->dataPtr->navsatConverter.ecef2Geodetic(recECEF(0), recECEF(1),recECEF(2), &latitude,
-                      &longitude, &altitude);
-    
-    // //Copy DOP values to the message.
-    // std::copy(dop.begin(),
-    //         dop.end(),
-    //         gnss_multipath_fix_msg.dop.begin());
-    msg.set_latitude_deg(latitude);
-    msg.set_longitude_deg(longitude);
-    msg.set_altitude(altitude);
-    msg.set_velocity_east(this->dataPtr->velocity.X());
-    msg.set_velocity_north(this->dataPtr->velocity.Y());
-    msg.set_velocity_up(this->dataPtr->velocity.Z());
-  }
-  else 
+  for (int i = 0; i < visibleSatRangeMeas.size(); ++i)
   {
-    // No FIX
-    msg.set_latitude_deg(NAN);
-    msg.set_longitude_deg(NAN);
-    msg.set_altitude(NAN);
-    msg.set_velocity_east(NAN);
-    msg.set_velocity_north(NAN);
-    msg.set_velocity_up(NAN);
+      msg.add_satellite_ranges(gz::math::NAN_F);
+      msg.set_satellite_ranges(i, visibleSatRangeMeas[i]);
   }
-  // msg.set_latitude_deg(this->dataPtr->latitude.Degree());
-  // msg.set_longitude_deg(this->dataPtr->longitude.Degree());
-  // msg.set_altitude(this->dataPtr->altitude);
-  // msg.set_velocity_east(this->dataPtr->velocity.X());
-  // msg.set_velocity_north(this->dataPtr->velocity.Y());
-  // msg.set_velocity_up(this->dataPtr->velocity.Z());
+  // if ((activeNumSat - numSatBlocked) > 4)
+  // {
+  //   // Found a FIX 
+  //   // Calculate the reciever's position using the satellite's predicted coordinates and the pseudo-ranges.
+  //   Eigen::Vector3d recECEF(0,0,0);  
+  //   std::vector<double> dop;
+  //   double latitude=0, longitude=0, altitude=0;
+
+  //   GetLeastSquaresEstimate(visibleSatRangeMeas,  visibleSatECEF, recECEF);
+  //   CalculateDOP(visibleSatECEF, recECEF, dop);
+    
+  //   this->dataPtr->navsatConverter.ecef2Geodetic(recECEF(0), recECEF(1),recECEF(2), &latitude,
+  //                     &longitude, &altitude);
+    
+  //   // //Copy DOP values to the message.
+  //   // std::copy(dop.begin(),
+  //   //         dop.end(),
+  //   //         gnss_multipath_fix_msg.dop.begin());
+  //   msg.set_latitude_deg(latitude);
+  //   msg.set_longitude_deg(longitude+0.00001);
+  //   msg.set_altitude(altitude);
+  //   msg.set_velocity_east(this->dataPtr->velocity.X());
+  //   msg.set_velocity_north(this->dataPtr->velocity.Y());
+  //   msg.set_velocity_up(this->dataPtr->velocity.Z());
+  // }
+  // else 
+  // {
+  //   // No FIX
+  //   gzerr << "No fix"<< std::endl;
+  //   msg.set_latitude_deg(NAN);
+  //   msg.set_longitude_deg(NAN);
+  //   msg.set_altitude(NAN);
+  //   msg.set_velocity_east(NAN);
+  //   msg.set_velocity_north(NAN);
+  //   msg.set_velocity_up(NAN);
+  // }
+  this->dataPtr->count++;
+  msg.set_latitude_deg(this->dataPtr->latitude.Degree()); //+ 0.0000001 * this->dataPtr->count);
+  msg.set_longitude_deg(this->dataPtr->longitude.Degree());
+  msg.set_altitude(this->dataPtr->altitude);
+  msg.set_velocity_east(this->dataPtr->velocity.X());
+  msg.set_velocity_north(this->dataPtr->velocity.Y());
+  msg.set_velocity_up(this->dataPtr->velocity.Z());
+
+  //gzerr << this->dataPtr->latitude.Degree()<<" "<< this->dataPtr->latitude.Degree() + 0.000001 * this->dataPtr->count<< std::endl;
   // publish
   this->AddSequence(msg.mutable_header());
   this->dataPtr->pub.Publish(msg);
@@ -614,6 +636,14 @@ void NavSatMultipathSensor::SetPosition(const math::Angle &_latitude,
   this->SetLatitude(_latitude);
   this->SetLongitude(_longitude);
   this->SetAltitude(_altitude);
+}
+
+void NavSatMultipathSensor::SetSpooferPosition(const math::Angle &_latitude,
+    const math::Angle &_longitude, double _altitude)
+{
+  this->dataPtr->spooferLat = _latitude;
+  this->dataPtr->spooferLon = _longitude;
+  this->dataPtr->spooferAlt = _altitude;
 }
 
 //////////////////////////////////////////////////
