@@ -120,17 +120,7 @@ class gz::sensors::NavSatMultipathPrivate
 
   // Time information to get the satellite position
   public: struct tm *timeinfo;
-
-  /// \brief Latitude angle
-  public: math::Angle spooferLat;
-
-  /// \brief Longitude angle
-  public: math::Angle spooferLon;
-
-  /// \brief Altitude
-  public: double spooferAlt = 0.0;
-
-
+  
   public: int count;
 
 };
@@ -636,14 +626,6 @@ void NavSatMultipathSensor::SetPosition(const math::Angle &_latitude,
   this->SetLatitude(_latitude);
   this->SetLongitude(_longitude);
   this->SetAltitude(_altitude);
-}
-
-void NavSatMultipathSensor::SetSpooferPosition(const math::Angle &_latitude,
-    const math::Angle &_longitude, double _altitude)
-{
-  this->dataPtr->spooferLat = _latitude;
-  this->dataPtr->spooferLon = _longitude;
-  this->dataPtr->spooferAlt = _altitude;
 }
 
 //////////////////////////////////////////////////
