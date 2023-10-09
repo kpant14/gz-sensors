@@ -462,6 +462,8 @@ bool NavSatMultipathSensor::Update(const std::chrono::steady_clock::duration &_n
 
   int numSatBlocked = 0;
   std::vector<double> visibleSatRangeMeas;
+  std::vector<double> visibleSatAzimuth;
+  std::vector<double> visibleSatElevation;
   std::vector<std::vector<double>> visibleSatECEF;
   
   // Iterate for all the visible satellites (positive elevation angles)
@@ -485,8 +487,10 @@ bool NavSatMultipathSensor::Update(const std::chrono::steady_clock::duration &_n
           if (rangeOffset < 50)
           {
             //RCLCPP_INFO(ros_node_->get_logger(), "offset:%d %f", i, range_offset);
-            visibleSatRangeMeas.push_back(satTrueRange[i] + rangeOffset*0.1);
+            visibleSatRangeMeas.push_back(satTrueRange[i] );//+ rangeOffset*0.1);
             visibleSatECEF.push_back(satECEF[i]);
+            visibleSatAzimuth.push_back(azimuth[i]);
+            visibleSatElevation.push_back(elevation[i]);
           }
           else
           {
@@ -505,6 +509,8 @@ bool NavSatMultipathSensor::Update(const std::chrono::steady_clock::duration &_n
         // unobstructed sat reading
         visibleSatRangeMeas.push_back(satTrueRange[i]);
         visibleSatECEF.push_back(satECEF[i]);
+        visibleSatAzimuth.push_back(azimuth[i]);
+        visibleSatElevation.push_back(elevation[i]);
       }
     }
     else
@@ -513,11 +519,27 @@ bool NavSatMultipathSensor::Update(const std::chrono::steady_clock::duration &_n
       numSatBlocked++;
     }
   }
-
+  msgs::NavSatMultipath::SatelliteECEF *msg_sat_ecef;
+  msgs::NavSatMultipath::SatelliteAngle *msg_sat_angle;
   for (int i = 0; i < visibleSatRangeMeas.size(); ++i)
   {
-      msg.add_satellite_ranges(gz::math::NAN_F);
-      msg.set_satellite_ranges(i, visibleSatRangeMeas[i]);
+    // Adding message fields  
+    msg.add_satellite_range(0.0);
+    msg.add_satellite_name();
+   
+    msg_sat_ecef = msg.add_satellite_ecef();
+    msg_sat_angle = msg.add_satellite_angle();
+
+    // Setting the values of the content of the individual messages
+    msg.set_satellite_name(i, "aa");
+    msg.set_satellite_range(i, visibleSatRangeMeas[i]);
+    // Setting satellite ECEF coordinates
+    msg_sat_ecef->set_x(visibleSatECEF[i][0]);
+    msg_sat_ecef->set_y(visibleSatECEF[i][1]);
+    msg_sat_ecef->set_z(visibleSatECEF[i][2]);
+    // Setting satellite Azimuth/Elevation Angles
+    msg_sat_angle->set_azimuth(visibleSatAzimuth[i]);
+    msg_sat_angle->set_elevation(visibleSatElevation[i]); 
   }
   // if ((activeNumSat - numSatBlocked) > 4)
   // {
@@ -538,7 +560,7 @@ bool NavSatMultipathSensor::Update(const std::chrono::steady_clock::duration &_n
   //   //         dop.end(),
   //   //         gnss_multipath_fix_msg.dop.begin());
   //   msg.set_latitude_deg(latitude);
-  //   msg.set_longitude_deg(longitude+0.00001);
+  //   msg.set_longitude_deg(longitude);
   //   msg.set_altitude(altitude);
   //   msg.set_velocity_east(this->dataPtr->velocity.X());
   //   msg.set_velocity_north(this->dataPtr->velocity.Y());
@@ -555,16 +577,14 @@ bool NavSatMultipathSensor::Update(const std::chrono::steady_clock::duration &_n
   //   msg.set_velocity_north(NAN);
   //   msg.set_velocity_up(NAN);
   // }
-  this->dataPtr->count++;
-  msg.set_latitude_deg(this->dataPtr->latitude.Degree()); //+ 0.0000001 * this->dataPtr->count);
+  msg.set_latitude_deg(this->dataPtr->latitude.Degree());
   msg.set_longitude_deg(this->dataPtr->longitude.Degree());
   msg.set_altitude(this->dataPtr->altitude);
   msg.set_velocity_east(this->dataPtr->velocity.X());
   msg.set_velocity_north(this->dataPtr->velocity.Y());
   msg.set_velocity_up(this->dataPtr->velocity.Z());
 
-  //gzerr << this->dataPtr->latitude.Degree()<<" "<< this->dataPtr->latitude.Degree() + 0.000001 * this->dataPtr->count<< std::endl;
-  // publish
+  // publishing the message over gz-transport 
   this->AddSequence(msg.mutable_header());
   this->dataPtr->pub.Publish(msg);
 

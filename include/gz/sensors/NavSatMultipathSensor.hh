@@ -159,8 +159,8 @@ namespace gz
 
 
       private: void SetRayAngles(std::vector<double> _azimuth, std::vector<double> _elevation); 
-      private: bool GetLeastSquaresEstimate(std::vector<double> _meas, std::vector<std::vector<double>> _sat_ecef, Eigen::Vector3d & _rec_ecef);
-      private: void CalculateDOP(std::vector<std::vector<double>> _sat_ecef, 
+      public: bool GetLeastSquaresEstimate(std::vector<double> _meas, std::vector<std::vector<double>> _sat_ecef, Eigen::Vector3d & _rec_ecef);
+      public: void CalculateDOP(std::vector<std::vector<double>> _sat_ecef, 
                         Eigen::Vector3d _rec_ecef, std::vector<double> &_dop);
       private: void ParseSatelliteTLE();
       private: void GetSatellitesInfo(struct tm *_timeinfo, std::vector<double> _rec_lla,
